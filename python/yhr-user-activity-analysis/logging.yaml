@@ -1,0 +1,24 @@
+version: 1
+formatters:
+  default:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: default
+  file:
+    class: logging.FileHandler
+    filename: app.log
+    formatter: default
+loggers:
+  src.database:
+    level: DEBUG
+    handlers:
+      - file
+    # root logger level may coincide with this and may result in logging twice so set to no
+    propagate: no
+root:
+  level: INFO
+  handlers:
+    - console
+    - file

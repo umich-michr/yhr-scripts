@@ -1,0 +1,40 @@
+# Virtual environments
+venv/
+env/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Testing cache
+.pytest_cache/
+*.cache
+
+# IDE-specific files
+.idea/
+.vscode/
+
+# Log files
+*.log
+
+# Sensitive configuration files
+.env
+
+# Operating system files
+.DS_Store
+
+# Build artifacts
+dist/
+build/
+
+# Output files
+enriched_output.csv
+
+# Test reports
+test-reports/
+coverage/
+htmlcov/
+
+# Coverage configuration
+.coverage

@@ -1,0 +1,101 @@
+import pytest
+import requests
+from src.geolocation import GeolocationClient
+from unittest.mock import patch, MagicMock
+
+@pytest.fixture
+def geo_client():
+    """Fixture for GeolocationClient instance."""
+    return GeolocationClient(base_url="https://test-api.com", rate_limit_delay=0.1)
+
+def test_init_default():
+    """Test initialization with default parameters."""
+    client = GeolocationClient()
+    assert client.base_url == "https://ipapi.co"
+    assert client.rate_limit_delay == 0.1
+
+def test_init_custom():
+    """Test initialization with custom parameters."""
+    client = GeolocationClient(base_url="https://custom-api.com", rate_limit_delay=0.2)
+    assert client.base_url == "https://custom-api.com"
+    assert client.rate_limit_delay == 0.2
+
+def test_get_geolocation_success(geo_client):
+    """Test successful geolocation lookup."""
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "city": "San Francisco",
+        "region": "California",
+        "country_name": "United States",
+        "postal": "94105",
+        "org": "ExampleOrg"
+    }
+    with patch('requests.get') as mock_get, patch('time.sleep') as mock_sleep:
+        mock_get.return_value = mock_response
+        result = geo_client.get_geolocation("1.2.3.4")
+        assert result == {
+            "city": "San Francisco",
+            "region": "California",
+            "country": "United States",
+            "postal": "94105",
+            "org": "ExampleOrg"
+        }
+        mock_get.assert_called_once_with("https://test-api.com/1.2.3.4/json/")
+        mock_sleep.assert_called_once_with(0.1)
+
+def test_get_geolocation_request_error(geo_client):
+    """Test geolocation failure returns default values."""
+    with patch('requests.get') as mock_get, patch('time.sleep') as mock_sleep:
+        mock_get.side_effect = requests.RequestException("Network error")
+        result = geo_client.get_geolocation("1.2.3.4")
+        assert result == {
+            "city": "Unknown",
+            "region": "Unknown",
+            "country": "Unknown",
+            "postal": "Unknown",
+            "org": "Unknown"
+        }
+        mock_get.assert_called_once_with("https://test-api.com/1.2.3.4/json/")
+        mock_sleep.assert_called_once_with(0.1)
+
+def test_get_geolocations_success(geo_client):
+    """Test successful geolocation lookup for multiple IPs."""
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "city": "San Francisco",
+        "region": "California",
+        "country_name": "United States",
+        "postal": "94105",
+        "org": "ExampleOrg"
+    }
+    with patch('requests.get') as mock_get, patch('time.sleep') as mock_sleep:
+        mock_get.return_value = mock_response
+        result = geo_client.get_geolocations(["1.2.3.4", "5.6.7.8"])
+        assert result == {
+            "1.2.3.4": {
+                "city": "San Francisco",
+                "region": "California",
+                "country": "United States",
+                "postal": "94105",
+                "org": "ExampleOrg"
+            },
+            "5.6.7.8": {
+                "city": "San Francisco",
+                "region": "California",
+                "country": "United States",
+                "postal": "94105",
+                "org": "ExampleOrg"
+            }
+        }
+        mock_get.assert_any_call("https://test-api.com/1.2.3.4/json/")
+        mock_get.assert_any_call("https://test-api.com/5.6.7.8/json/")
+        assert mock_get.call_count == 2
+        assert mock_sleep.call_count == 2
+
+def test_get_geolocations_empty(geo_client):
+    """Test geolocation lookup with empty IP list."""
+    with patch('requests.get') as mock_get, patch('time.sleep') as mock_sleep:
+        result = geo_client.get_geolocations([])
+        assert result == {}
+        mock_get.assert_not_called()
+        mock_sleep.assert_not_called()
