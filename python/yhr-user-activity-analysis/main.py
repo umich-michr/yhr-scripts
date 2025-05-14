@@ -16,18 +16,15 @@ def main():
         dsn = get_dsn(config)
 
         # Initialize clients
-        db_client = DatabaseClient(
+        db_client = DatabaseClient.from_credentials(
             username=config['db_username'],
             password=config['db_password'],
             dsn=dsn
         )
         geo_client = GeolocationClient()
 
-        # Execute query
-        db_client.connect()
         df = db_client.execute_query(STUDY_INTEREST_QUERY)
         df.columns = [col.upper() for col in df.columns]
-        db_client.close()
 
         # Check if the DataFrame is empty
         if df.empty:
@@ -42,8 +39,11 @@ def main():
 
         # Process data
         unique_ips = df['SOURCE_ADDRESS'].unique()
+        logger.info("Checking locations for IP addresses...")
         # geolocation_data = geo_client.get_geolocations(unique_ips)
+        logger.info("Finished collecting locations for IP addresses")
         # enriched_df = enrich_dataframe(df, geolocation_data)
+        logger.debug("Enriched db data with locations for IP addresses")
         # save_dataframe(enriched_df, 'enriched_output.csv')
         save_dataframe(df, 'enriched_output.csv')
 

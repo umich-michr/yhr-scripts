@@ -84,6 +84,19 @@ PYTHONPATH=. pytest tests/
 PYTHONPATH=. pytest --cov=src tests/ --cov-report=term --cov-report=html
 ```
 
+## Test output to terminal
+
+Display log messages with level INFO and above in the terminal.
+```bash
+pytest --log-cli-level=INFO tests/
+```
+
+If you're using a testing framework like Pytest, you can use the -s or --capture=no option to disable output capture and see the print statements in real-time.
+For example, you can run your tests like this:
+```bash
+pytest -s tests/
+```
+
 ## Run a single test
 
 ```bash

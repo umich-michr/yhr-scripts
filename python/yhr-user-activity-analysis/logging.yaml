@@ -12,7 +12,7 @@ handlers:
     formatter: default
 loggers:
   src.database:
-    level: DEBUG
+    level: ERROR
     handlers:
       - file
     # root logger level may coincide with this and may result in logging twice so set to no
