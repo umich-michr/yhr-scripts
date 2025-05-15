@@ -1,114 +1,105 @@
+from unittest.mock import MagicMock, mock_open, patch
+
 import pandas as pd
+import pytest
 
-from src.processor import enrich_dataframe, save_dataframe
+from src.processor import (
+    enrich_row,
+    process_and_write_rows,
+    process_row,
+    save_row,
+    write_headers,
+)
 
 
-def test_enrich_dataframe():
-    # Create a sample DataFrame
-    df = pd.DataFrame({"SOURCE_ADDRESS": ["192.168.1.1", "8.8.8.8"]})
+@pytest.fixture
+def sample_dataframe():
+    """Return a sample DataFrame for testing."""
+    return pd.DataFrame(
+        {"SOURCE_ADDRESS": ["192.168.1.1", "8.8.8.8"], "DATA": ["data1", "data2"]}
+    )
 
-    # Create sample geolocation data
+
+@pytest.fixture
+def geo_client_mock():
+    """Return a mock geolocation client."""
+    mock_client = MagicMock()
+    mock_client.get_geolocation.side_effect = lambda ip: {
+        "city": "City-" + ip,
+        "region": "Region-" + ip,
+        "country": "Country-" + ip,
+        "postal": "Postal-" + ip,
+        "org": "Org-" + ip,
+    }
+    return mock_client
+
+
+def test_write_headers():
+    """Test that headers are written correctly."""
+    columns = ["COLUMN1", "COLUMN2"]
+    mock_file = mock_open()
+    with patch("builtins.open", mock_file):
+        with open("mock_output.csv", "w") as f:
+            write_headers(columns, f)
+
+    mock_file().write.assert_called_once_with("COLUMN1,COLUMN2\n")
+
+
+def test_enrich_row():
+    """Test that a row is enriched with geolocation data."""
+    row = {"SOURCE_ADDRESS": "192.168.1.1", "DATA": "data1"}
     geolocation_data = {
-        "192.168.1.1": {
-            "city": "New York",
-            "region": "NY",
-            "country": "US",
-            "postal": "10001",
-            "org": "Example Org",
-        },
-        "8.8.8.8": {
-            "city": "Mountain View",
-            "region": "CA",
-            "country": "US",
-            "postal": "94043",
-            "org": "Google",
-        },
+        "city": "Test City",
+        "region": "Test Region",
+        "country": "Test Country",
+        "postal": "12345",
+        "org": "Test Org",
     }
+    enriched_row = enrich_row(row, geolocation_data)
 
-    # Enrich the DataFrame
-    enriched_df = enrich_dataframe(df, geolocation_data)
-
-    # Verify the enriched DataFrame
-    assert enriched_df.shape == (2, 6)
-    assert enriched_df["city"].tolist() == ["New York", "Mountain View"]
-    assert enriched_df["region"].tolist() == ["NY", "CA"]
-    assert enriched_df["country"].tolist() == ["US", "US"]
-    assert enriched_df["postal"].tolist() == ["10001", "94043"]
-    assert enriched_df["org"].tolist() == ["Example Org", "Google"]
+    assert enriched_row["CITY"] == "Test City"
+    assert enriched_row["REGION"] == "Test Region"
+    assert enriched_row["COUNTRY"] == "Test Country"
+    assert enriched_row["POSTAL"] == "12345"
+    assert enriched_row["ORG"] == "Test Org"
 
 
-def test_enrich_dataframe_missing_ip():
-    # Create a sample DataFrame
-    df = pd.DataFrame({"SOURCE_ADDRESS": ["192.168.1.1", "8.8.8.8"]})
+def test_save_row():
+    """Test that a row is saved correctly to the file."""
+    row = {"COLUMN1": "value1", "COLUMN2": "value2"}
+    mock_file = mock_open()
+    with patch("builtins.open", mock_file):
+        with open("mock_output.csv", "w") as f:
+            save_row(row, f)
 
-    # Create sample geolocation data (missing one IP)
-    geolocation_data = {
-        "192.168.1.1": {
-            "city": "New York",
-            "region": "NY",
-            "country": "US",
-            "postal": "10001",
-            "org": "Example Org",
-        }
-    }
-
-    # Enrich the DataFrame
-    enriched_df = enrich_dataframe(df, geolocation_data)
-
-    # Verify the enriched DataFrame
-    expected_values = {
-        "192.168.1.1": {
-            "city": "New York",
-            "region": "NY",
-            "country": "US",
-            "postal": "10001",
-            "org": "Example Org",
-        },
-        "8.8.8.8": {
-            "city": "unknown",
-            "region": "unknown",
-            "country": "unknown",
-            "postal": "unknown",
-            "org": "unknown",
-        },
-    }
-
-    for field in ["city", "region", "country", "postal", "org"]:
-        assert enriched_df[field].tolist() == [
-            expected_values[ip][field] for ip in df["SOURCE_ADDRESS"]
-        ]
+    # Validate that the correct content was written to the file
+    mock_file().write.assert_called_once_with("value1,value2\n")
 
 
-def test_save_dataframe(tmp_path):
-    # Create a sample DataFrame
-    df = pd.DataFrame({"SOURCE_ADDRESS": ["192.168.1.1", "8.8.8.8"]})
+def test_process_row(geo_client_mock):
+    """Test that a single row is processed and saved correctly."""
+    row = {"SOURCE_ADDRESS": "192.168.1.1", "DATA": "data1"}
+    mock_file = mock_open()
+    with patch("builtins.open", mock_file):
+        with open("mock_output.csv", "w") as f:
+            process_row(row, geo_client_mock, f)
 
-    # Save the DataFrame to a CSV file
-    output_path = tmp_path / "output.csv"
-    save_dataframe(df, output_path)
-
-    # Verify the CSV file exists
-    assert output_path.exists()
-
-    # Verify the CSV file contents
-    saved_df = pd.read_csv(output_path)
-    assert saved_df.equals(df)
+    geo_client_mock.get_geolocation.assert_called_once_with("192.168.1.1")
+    # Validate that the enriched row was written to the file
+    mock_file().write.assert_called_once_with(
+        "192.168.1.1,data1,City-192.168.1.1,Region-192.168.1.1,Country-192.168.1.1,Postal-192.168.1.1,Org-192.168.1.1\n"
+    )
 
 
-def test_save_dataframe_overwrite(tmp_path):
-    # Create a sample DataFrame
-    df = pd.DataFrame({"SOURCE_ADDRESS": ["192.168.1.1", "8.8.8.8"]})
+def test_process_and_write_rows(sample_dataframe, geo_client_mock):
+    """Test that all rows in a DataFrame are processed and written to a file."""
+    mock_file = mock_open()
+    with patch("builtins.open", mock_file):
+        process_and_write_rows(sample_dataframe, geo_client_mock)
 
-    # Save the DataFrame to a CSV file
-    output_path = tmp_path / "output.csv"
-    save_dataframe(df, output_path)
+    # Verify headers are written once
+    mock_file().write.assert_any_call("SOURCE_ADDRESS,DATA\n")
 
-    # Save the DataFrame again (should overwrite)
-    save_dataframe(df, output_path)
-
-    # Verify the CSV file exists
-    assert output_path.exists()
-
-    # Verify the CSV file contents
-    saved_df = pd.read_csv(output_path)
-    assert saved_df.equals(df)
+    # Verify rows are processed
+    assert geo_client_mock.get_geolocation.call_count == 2
+    assert mock_file().write.call_count == 3  # 1 header + 2 rows
