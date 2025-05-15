@@ -3,7 +3,7 @@ from logger import configure_logging
 from src.config import load_config, get_dsn
 from src.database import DatabaseClient
 from src.geolocation import GeolocationClient
-from src.processor import enrich_dataframe, save_dataframe
+from src.processor import process_and_write_rows
 from src.queries import STUDY_INTEREST_QUERY
 
 logger = logging.getLogger(__name__)
@@ -37,15 +37,7 @@ def main():
             logger.error("Available columns:", df.columns)
             return
 
-        # Process data
-        unique_ips = df['SOURCE_ADDRESS'].unique()
-        logger.info("Checking locations for IP addresses...")
-        geolocation_data = geo_client.get_geolocations(unique_ips)
-        logger.info("Finished collecting locations for IP addresses")
-        enriched_df = enrich_dataframe(df, geolocation_data)
-        logger.debug("Enriched db data with locations for IP addresses")
-        save_dataframe(enriched_df, 'enriched_output.csv')
-        #save_dataframe(df, 'enriched_output.csv')
+        process_and_write_rows(df, geo_client)
 
         print("Processing complete. Output saved to enriched_output.csv")
     except Exception as e:
