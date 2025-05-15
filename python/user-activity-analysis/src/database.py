@@ -1,17 +1,18 @@
-import oracledb
-from sqlalchemy import create_engine
-import pandas as pd
 import logging
+
+import pandas as pd
+from sqlalchemy import create_engine
 
 logger = logging.getLogger(__name__)
 
+
 class DatabaseConnectionError(Exception):
     """Custom exception for database connection errors."""
-    pass
+
 
 class QueryExecutionError(Exception):
     """Custom exception for query execution errors."""
-    pass
+
 
 class DatabaseClient:
     def __init__(self, engine):
@@ -30,7 +31,9 @@ class DatabaseClient:
             logger.error(f"Caught exception: {type(e).__name__}: {e}")
             raise DatabaseConnectionError(f"Invalid DSN format: {dsn}") from e
         try:
-            engine = create_engine(f"oracle+oracledb://{username}:{password}@{host}:{port}/?service_name={service}")
+            engine = create_engine(
+                f"oracle+oracledb://{username}:{password}@{host}:{port}/?service_name={service}"
+            )
         except Exception as e:
             logger.error(f"Caught exception: {type(e).__name__}: {e}")
             raise DatabaseConnectionError(f"Database connection failed: {e}") from e
@@ -43,7 +46,7 @@ class DatabaseClient:
         try:
             with self.engine.connect() as connection:
                 df = pd.read_sql(query, connection)
-                df.columns = [col.lower() for col in df.columns]
+                df = df.rename(columns=str.lower)
                 return df
         except Exception as e:
             raise QueryExecutionError(f"Query execution failed: {e}") from e
