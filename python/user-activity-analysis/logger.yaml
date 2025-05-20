@@ -17,8 +17,18 @@ loggers:
       - file
     # root logger level may coincide with this and may result in logging twice so set to no
     propagate: no
+  src.ip_lookup:
+    level: INFO
+    handlers:
+      - file
+    propagate: no
+  src.row_enricher:
+    level: INFO
+    handlers:
+      - file
+    propagate: no
 root:
   level: INFO
   handlers:
-    - console
+    #- console
     - file

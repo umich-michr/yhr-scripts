@@ -16,6 +16,7 @@ def load_config(
             "DB_HOST",
             "DB_PORT",
             "DB_SERVICE_NAME",
+            "BACKUP_SCHEMA_NAME",
         ]
 
     if optional_vars is None:
@@ -33,10 +34,7 @@ def _validate_environment_variables(required_vars: List[str]) -> None:
     """Validate that required environment variables are set."""
     missing_vars = [var for var in required_vars if var not in os.environ]
     if missing_vars:
-        raise ValueError(
-            f"Missing environment variables: {
-                ', '.join(missing_vars)}"
-        )
+        raise ValueError(f"Missing environment variables: {', '.join(missing_vars)}")
 
 
 def _load_environment_variables(vars: List[str]) -> Dict[str, str]:

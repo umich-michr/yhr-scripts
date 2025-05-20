@@ -1,7 +1,7 @@
 import logging
+from typing import Any, Dict, Iterator
 
-import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +39,16 @@ class DatabaseClient:
             raise DatabaseConnectionError(f"Database connection failed: {e}") from e
         return cls(engine)
 
-    def execute_query(self, query: str) -> pd.DataFrame:
-        """Execute SQL query and return results as DataFrame."""
-        if not self.engine:
-            raise DatabaseConnectionError("No active database connection")
+    def stream_rows(self, query: str, params: dict) -> Iterator[Dict[str, Any]]:
+        """Stream rows from the database as dictionaries."""
         try:
-            with self.engine.connect() as connection:
-                df = pd.read_sql(query, connection)
-                df = df.rename(columns=str.lower)
-                return df
+            with self.engine.connect() as conn:
+                result = conn.execution_options(stream_results=True).execute(
+                    text(query), params
+                )
+                columns = result.keys()
+                for row in result:
+                    yield dict(zip(columns, row))
         except Exception as e:
+            logger.error(f"Query execution failed: {e}")
             raise QueryExecutionError(f"Query execution failed: {e}") from e

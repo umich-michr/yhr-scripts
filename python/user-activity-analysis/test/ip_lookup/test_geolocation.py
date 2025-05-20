@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from src.geolocation import GeolocationClient
+from src.ip_lookup.geolocation import GeolocationClient
 
 
 @pytest.fixture
@@ -18,6 +18,7 @@ def test_init_default():
     assert client.base_url == "https://ipapi.co"
     assert client.api_key == "test_api_key"
     assert client.rate_limit_delay == 0.1
+    assert isinstance(client._cache, dict)
 
 
 def test_get_geolocation_success(geo_client):
@@ -45,6 +46,13 @@ def test_get_geolocation_success(geo_client):
         )
         mock_sleep.assert_called_once_with(0.1)
 
+    # Test cache hit (should not call requests.get or time.sleep again)
+    with patch("requests.get") as mock_get, patch("time.sleep") as mock_sleep:
+        cached_result = geo_client.get_geolocation("1.2.3.4")
+        assert cached_result == result
+        mock_get.assert_not_called()
+        mock_sleep.assert_not_called()
+
 
 def test_get_geolocation_request_error(geo_client):
     """Test geolocation failure returns default values."""
@@ -62,6 +70,36 @@ def test_get_geolocation_request_error(geo_client):
             "https://ipapi.co/1.2.3.4/json/?key=test_api_key"
         )
         mock_sleep.assert_called_once_with(0.1)
+
+    # Test cache hit for failed lookup
+    with patch("requests.get") as mock_get, patch("time.sleep") as mock_sleep:
+        cached_result = geo_client.get_geolocation("1.2.3.4")
+        assert cached_result == {
+            "city": "Unknown",
+            "region": "Unknown",
+            "country": "Unknown",
+            "postal": "Unknown",
+            "org": "Unknown",
+        }
+        mock_get.assert_not_called()
+        mock_sleep.assert_not_called()
+
+
+def test_get_geolocation_empty_ip(geo_client):
+    """Test geolocation lookup with empty IP returns Unknowns and does not cache."""
+    with patch("requests.get") as mock_get, patch("time.sleep") as mock_sleep:
+        result = geo_client.get_geolocation("")
+        assert result == {
+            "city": "Unknown",
+            "region": "Unknown",
+            "country": "Unknown",
+            "postal": "Unknown",
+            "org": "Unknown",
+        }
+        mock_get.assert_not_called()
+        mock_sleep.assert_not_called()
+    # Should not be cached
+    assert "" not in geo_client._cache
 
 
 def test_get_geolocations_success(geo_client):
@@ -97,6 +135,14 @@ def test_get_geolocations_success(geo_client):
         mock_get.assert_any_call("https://ipapi.co/5.6.7.8/json/?key=test_api_key")
         assert mock_get.call_count == 2
         assert mock_sleep.call_count == 2
+
+    # Test cache hit for both IPs
+    with patch("requests.get") as mock_get, patch("time.sleep") as mock_sleep:
+        result = geo_client.get_geolocations(["1.2.3.4", "5.6.7.8"])
+        assert result["1.2.3.4"]["city"] == "San Francisco"
+        assert result["5.6.7.8"]["city"] == "San Francisco"
+        mock_get.assert_not_called()
+        mock_sleep.assert_not_called()
 
 
 def test_get_geolocations_empty(geo_client):

@@ -1,46 +1,15 @@
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
 import pytest
 
-from src.database import DatabaseClient, DatabaseConnectionError, QueryExecutionError
+from src.database import (DatabaseClient, DatabaseConnectionError,
+                          QueryExecutionError)
 
 
 @pytest.fixture
 def mock_engine():
     """Fixture for mock engine."""
     return MagicMock()
-
-
-def test_execute_query_success(mock_engine):
-    """Test successful query execution."""
-    with patch("pandas.read_sql") as mock_read_sql:
-        mock_df = pd.DataFrame({"study_id": [1]})
-        mock_read_sql.return_value = mock_df
-        mock_engine.connect.return_value.__enter__.return_value = MagicMock()
-        db_client = DatabaseClient(mock_engine)
-        result = db_client.execute_query("SELECT * FROM table")
-        pd.testing.assert_frame_equal(result, mock_df)
-        mock_read_sql.assert_called_once()
-
-
-def test_execute_query_no_connection():
-    """Test query execution fails without connection."""
-    db_client = DatabaseClient(None)
-    with pytest.raises(DatabaseConnectionError) as exc_info:
-        db_client.execute_query("SELECT * FROM table")
-    assert "No active database connection" in str(exc_info.value)
-
-
-def test_execute_query_failure(mock_engine):
-    """Test query execution failure raises QueryExecutionError."""
-    with patch("pandas.read_sql") as mock_read_sql:
-        mock_read_sql.side_effect = Exception("Query failed")
-        mock_engine.connect.return_value.__enter__.return_value = MagicMock()
-        db_client = DatabaseClient(mock_engine)
-        with pytest.raises(QueryExecutionError) as exc_info:
-            db_client.execute_query("SELECT * FROM table")
-        assert "Query execution failed" in str(exc_info.value)
 
 
 def test_from_credentials_success():
@@ -76,3 +45,37 @@ def test_from_credentials_failure_connection_error():
             assert "Database connection failed" in str(e)
             assert "Connection failed" in str(e.__cause__)
         mock_create_engine.assert_called_once()
+
+
+def test_stream_rows_yields_dicts(mock_engine):
+    # Mock result set
+    mock_result = MagicMock()
+    mock_result.keys.return_value = ["id", "study_id", "value"]
+    mock_result.__iter__.return_value = [
+        (1, 1234, "foo"),
+        (2, 1234, "bar"),
+    ]
+
+    mock_conn = MagicMock()
+    mock_conn.execution_options.return_value.execute.return_value = mock_result
+    mock_engine.connect.return_value.__enter__.return_value = mock_conn
+
+    db_client = DatabaseClient(mock_engine)
+    rows = list(db_client.stream_rows("SELECT ...", {"study_id": 1234}))
+    assert rows == [
+        {"id": 1, "study_id": 1234, "value": "foo"},
+        {"id": 2, "study_id": 1234, "value": "bar"},
+    ]
+
+
+def test_stream_rows_query_execution_error(mock_engine):
+    mock_conn = MagicMock()
+    mock_conn.execution_options.return_value.execute.side_effect = Exception(
+        "Query failed"
+    )
+    mock_engine.connect.return_value.__enter__.return_value = mock_conn
+
+    db_client = DatabaseClient(mock_engine)
+    with pytest.raises(QueryExecutionError) as exc_info:
+        list(db_client.stream_rows("SELECT ...", {"study_id": 1234}))
+    assert "Query execution failed" in str(exc_info.value)

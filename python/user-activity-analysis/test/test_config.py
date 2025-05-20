@@ -14,6 +14,7 @@ def test_load_config_success():
         "DB_PORT": "1521",
         "DB_SERVICE_NAME": "orclpdb1",
         "IP_LOOKUP_API_KEY": "test_api_key",
+        "BACKUP_SCHEMA_NAME": "test_backup_schema",
     }
     with patch("src.config.load_dotenv") as mock_dotenv:
         mock_dotenv.return_value = None  # Mock load_dotenv to do nothing
@@ -26,6 +27,7 @@ def test_load_config_success():
                 "db_port": "1521",
                 "db_service_name": "orclpdb1",
                 "ip_lookup_api_key": "test_api_key",
+                "backup_schema_name": "test_backup_schema",
             }
 
 
@@ -51,6 +53,7 @@ def test_load_config_optional_vars():
         "DB_HOST": "localhost",
         "DB_PORT": "1521",
         "DB_SERVICE_NAME": "orclpdb1",
+        "BACKUP_SCHEMA_NAME": "test_backup_schema",
     }
     with patch("src.config.load_dotenv") as mock_dotenv:
         mock_dotenv.return_value = None  # Mock load_dotenv to do nothing
